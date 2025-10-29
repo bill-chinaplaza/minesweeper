@@ -1,4 +1,4 @@
-import { RNG, createSeededRng, range } from './utils'
+import { RNG, createSeededRng } from './utils'
 
 export type Cell = {
   row: number
@@ -7,6 +7,7 @@ export type Cell = {
   isRevealed: boolean
   isFlagged: boolean
   isQuestion: boolean
+  isExploded: boolean
   adjacentMines: number
 }
 
@@ -23,6 +24,7 @@ export function createEmptyBoard(rows: number, cols: number): Board {
       isRevealed: false,
       isFlagged: false,
       isQuestion: false,
+      isExploded: false,
       adjacentMines: 0
     }))
   )
@@ -111,6 +113,7 @@ export function revealCell(board: Board, r: number, c: number): RevealResult {
   }
   if (start.isMine) {
     start.isRevealed = true
+    start.isExploded = true
     return { board: next, hitMine: true, revealed: 1 }
   }
   let revealed = 0
@@ -122,6 +125,7 @@ export function revealCell(board: Board, r: number, c: number): RevealResult {
     const cell = next[row][col]
     if (cell.isRevealed || cell.isFlagged) continue
     cell.isRevealed = true
+    cell.isExploded = false
     revealed++
     if (cell.adjacentMines === 0) {
       for (const n of neighbors(next, row, col)) {

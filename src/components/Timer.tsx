@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatTime } from '../lib/utils'
+import styles from '../styles/index.module.css'
 
 interface TimerProps {
   running: boolean
@@ -37,5 +38,9 @@ export default function Timer({ running, resetKey, onTick }: TimerProps) {
     }
   }, [running, onTick])
 
-  return <div className="counter" aria-label={`Time ${formatTime(seconds)}`}>{formatTime(seconds)}</div>
+  return (
+    <div className={styles.counter} aria-label={`Time ${formatTime(seconds)}`}>
+      {formatTime(seconds)}
+    </div>
+  )
 }
