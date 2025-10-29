@@ -11,6 +11,7 @@ import {
   revealCell,
   toggleMark
 } from './lib/board'
+import { applyTheme, getInitialTheme, persistTheme, ThemeName } from './lib/theme'
 
 const DIFFICULTIES: Difficulty[] = [
   { key: 'beginner', label: 'Beginner (9x9, 10)', rows: 9, cols: 9, mines: 10 },
@@ -24,6 +25,11 @@ function getBestKey(key: DifficultyKey) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<ThemeName>(() => {
+    const initialTheme = getInitialTheme()
+    applyTheme(initialTheme)
+    return initialTheme
+  })
   const [difficultyKey, setDifficultyKey] = useState<DifficultyKey>('beginner')
   const difficulty = DIFFICULTIES.find((d) => d.key === difficultyKey)!
   const [rows, setRows] = useState(difficulty.rows)
@@ -37,6 +43,11 @@ export default function App() {
   const [elapsed, setElapsed] = useState(0)
 
   const minesLeft = useMemo(() => Math.max(0, mines - countFlags(board)), [mines, board])
+
+  useEffect(() => {
+    applyTheme(theme)
+    persistTheme(theme)
+  }, [theme])
 
   // Persist best times for built-in difficulties only
   const bestTime = useMemo(() => {
@@ -138,6 +149,10 @@ export default function App() {
     setBoard(res.board)
   }
 
+  function toggleTheme() {
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
+  }
+
   function changeDifficulty(key: DifficultyKey) {
     setDifficultyKey(key)
   }
@@ -158,6 +173,8 @@ export default function App() {
         <Header
           difficulty={difficultyKey}
           difficulties={DIFFICULTIES}
+          theme={theme}
+          onToggleTheme={toggleTheme}
           minesLeft={minesLeft}
           running={running}
           resetKey={resetKey}

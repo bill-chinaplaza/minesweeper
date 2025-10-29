@@ -1,3 +1,4 @@
+import type { ThemeName } from '../lib/theme'
 import Counter from './Counter'
 import Timer from './Timer'
 
@@ -14,6 +15,8 @@ export type Difficulty = {
 interface HeaderProps {
   difficulty: DifficultyKey
   difficulties: Difficulty[]
+  theme: ThemeName
+  onToggleTheme: () => void
   minesLeft: number
   running: boolean
   resetKey: number
@@ -26,6 +29,8 @@ interface HeaderProps {
 export default function Header({
   difficulty,
   difficulties,
+  theme,
+  onToggleTheme,
   minesLeft,
   running,
   resetKey,
@@ -37,20 +42,34 @@ export default function Header({
   return (
     <div className="header" role="region" aria-label="Game header">
       <div className="header-left">
-        <label htmlFor="difficulty">Difficulty</label>
-        <select
-          id="difficulty"
-          className="select"
-          value={difficulty}
-          onChange={(e) => onChangeDifficulty(e.target.value as DifficultyKey)}
-          aria-label="Select difficulty"
+        <div className="field">
+          <label htmlFor="difficulty">Difficulty</label>
+          <select
+            id="difficulty"
+            className="select"
+            value={difficulty}
+            onChange={(e) => onChangeDifficulty(e.target.value as DifficultyKey)}
+            aria-label="Select difficulty"
+          >
+            {difficulties.map((d) => (
+              <option key={d.key} value={d.key}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          className="button theme-toggle"
+          onClick={onToggleTheme}
+          aria-pressed={theme === 'dark'}
+          aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
         >
-          {difficulties.map((d) => (
-            <option key={d.key} value={d.key}>
-              {d.label}
-            </option>
-          ))}
-        </select>
+          <span aria-hidden="true" className="theme-toggle__icon">
+            {theme === 'dark' ? '🌙' : '☀️'}
+          </span>
+          <span className="theme-toggle__label">Theme: {theme === 'dark' ? 'Dark' : 'Light'}</span>
+        </button>
       </div>
       <div className="title">Minesweeper</div>
       <div className="header-right">
