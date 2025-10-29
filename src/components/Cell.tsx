@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import type { Cell as CellType } from '../lib/board'
+import styles from '../styles/index.module.css'
 
 interface CellProps {
   cell: CellType
@@ -31,11 +32,15 @@ export default function Cell({
 
   const isHidden = !cell.isRevealed
   const isMine = cell.isMine && cell.isRevealed
+  const isExploded = cell.isExploded
+  const numberClass =
+    cell.isRevealed && cell.adjacentMines > 0 ? styles[`num-${cell.adjacentMines}`] ?? '' : ''
   const classNames = [
-    'cell',
-    isHidden ? 'hidden' : 'revealed',
-    isMine ? 'mine' : '',
-    cell.adjacentMines > 0 && cell.isRevealed ? `num-${cell.adjacentMines}` : ''
+    styles.cell,
+    isHidden ? styles.hidden : styles.revealed,
+    isMine ? styles.mine : '',
+    isExploded ? styles.exploded : '',
+    numberClass
   ]
     .filter(Boolean)
     .join(' ')
@@ -45,12 +50,11 @@ export default function Cell({
       if (cell.isFlagged) return 'Flagged cell'
       if (cell.isQuestion) return 'Question cell'
       return 'Hidden cell'
-    } else {
-      if (cell.isMine) return 'Mine'
-      return cell.adjacentMines === 0
-        ? 'Empty cell'
-        : `Cell with ${cell.adjacentMines} mines around`
     }
+    if (cell.isMine) {
+      return cell.isExploded ? 'Exploded mine' : 'Mine'
+    }
+    return cell.adjacentMines === 0 ? 'Empty cell' : `Cell with ${cell.adjacentMines} mines around`
   })()
 
   function handleClick() {
@@ -65,12 +69,18 @@ export default function Cell({
   }
 
   function handleMouseDown(e: React.MouseEvent) {
-    // Middle click or left+right (buttons === 3) triggers chord
     if (disabled) return
+    // Middle click or simultaneous left+right click triggers chord
     if (e.button === 1 || e.buttons === 3) {
       e.preventDefault()
       onChord(cell.row, cell.col)
     }
+  }
+
+  function handleDoubleClick(e: React.MouseEvent) {
+    if (disabled) return
+    e.preventDefault()
+    if (cell.isRevealed) onChord(cell.row, cell.col)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -114,6 +124,7 @@ export default function Cell({
       onClick={handleClick}
       onContextMenu={handleContext}
       onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
       onKeyDown={handleKeyDown}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
@@ -122,7 +133,7 @@ export default function Cell({
       {cell.isRevealed && !cell.isMine && cell.adjacentMines > 0 ? cell.adjacentMines : null}
       {!cell.isRevealed && cell.isFlagged ? '🚩' : null}
       {!cell.isRevealed && !cell.isFlagged && cell.isQuestion ? '❓' : null}
-      {cell.isRevealed && cell.isMine ? '💣' : null}
+      {cell.isRevealed && cell.isMine ? (cell.isExploded ? '💥' : '💣') : null}
     </div>
   )
 }

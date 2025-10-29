@@ -1,6 +1,7 @@
 import type React from 'react'
 import type { Board as BoardT } from '../lib/board'
 import Cell from './Cell'
+import styles from '../styles/index.module.css'
 
 interface BoardProps {
   board: BoardT
@@ -53,7 +54,7 @@ export default function Board({
 
   return (
     <div
-      className="board"
+      className={styles.board}
       role="grid"
       aria-label="Minesweeper board"
       onKeyDown={onKeyDown}
@@ -64,7 +65,7 @@ export default function Board({
       }}
     >
       {board.map((row, r) => (
-        <div key={r} role="row" className="row" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+        <div key={r} role="row" className={styles.row} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
           {row.map((cell, c) => (
             <Cell
               key={`${r}-${c}`}

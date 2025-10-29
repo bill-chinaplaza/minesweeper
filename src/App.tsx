@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Board from './components/Board'
-import Header, { Difficulty, DifficultyKey } from './components/Header'
+import Header, { Difficulty, DifficultyKey, GameStatus } from './components/Header'
+import styles from './styles/index.module.css'
 import {
   Board as BoardT,
   checkWin,
@@ -19,39 +20,62 @@ const DIFFICULTIES: Difficulty[] = [
   { key: 'custom', label: 'Custom', rows: 10, cols: 10, mines: 10 }
 ]
 
+const DIFFICULTY_STORAGE_KEY = 'minesweeper:difficulty'
+const isBrowser = typeof window !== 'undefined'
+
 function getBestKey(key: DifficultyKey) {
   return `best-time-${key}`
 }
 
+function revealAllMines(board: BoardT): BoardT {
+  return board.map((row) =>
+    row.map((cell) => (cell.isMine ? { ...cell, isRevealed: true } : cell))
+  )
+}
+
 export default function App() {
-  const [difficultyKey, setDifficultyKey] = useState<DifficultyKey>('beginner')
+  const [difficultyKey, setDifficultyKey] = useState<DifficultyKey>(() => {
+    if (isBrowser) {
+      const stored = window.localStorage.getItem(DIFFICULTY_STORAGE_KEY) as DifficultyKey | null
+      if (stored && DIFFICULTIES.some((d) => d.key === stored)) {
+        return stored
+      }
+    }
+    return 'beginner'
+  })
+
   const difficulty = DIFFICULTIES.find((d) => d.key === difficultyKey)!
+
   const [rows, setRows] = useState(difficulty.rows)
   const [cols, setCols] = useState(difficulty.cols)
   const [mines, setMines] = useState(difficulty.mines)
   const [board, setBoard] = useState<BoardT>(() => createEmptyBoard(rows, cols))
-  const [status, setStatus] = useState<'ready' | 'running' | 'won' | 'lost'>('ready')
+  const [status, setStatus] = useState<GameStatus>('ready')
   const [firstClickDone, setFirstClickDone] = useState(false)
   const [resetKey, setResetKey] = useState(0)
   const [focused, setFocused] = useState({ row: 0, col: 0 })
   const [elapsed, setElapsed] = useState(0)
 
-  const minesLeft = useMemo(() => Math.max(0, mines - countFlags(board)), [mines, board])
+  const minesLeft = useMemo(() => mines - countFlags(board), [mines, board])
 
-  // Persist best times for built-in difficulties only
   const bestTime = useMemo(() => {
-    if (difficultyKey === 'custom') return null
-    const v = localStorage.getItem(getBestKey(difficultyKey))
-    return v ? parseInt(v, 10) : null
-  }, [difficultyKey])
+    if (!isBrowser || difficultyKey === 'custom') return null
+    const value = window.localStorage.getItem(getBestKey(difficultyKey))
+    return value ? parseInt(value, 10) : null
+  }, [difficultyKey, status])
 
   useEffect(() => {
-    // When difficulty changes, reset params
-    const d = DIFFICULTIES.find((d) => d.key === difficultyKey)!
+    const d = DIFFICULTIES.find((item) => item.key === difficultyKey)!
     setRows(d.rows)
     setCols(d.cols)
     setMines(d.mines)
     resetGame(d.rows, d.cols)
+  }, [difficultyKey])
+
+  useEffect(() => {
+    if (isBrowser) {
+      window.localStorage.setItem(DIFFICULTY_STORAGE_KEY, difficultyKey)
+    }
   }, [difficultyKey])
 
   function resetGame(r = rows, c = cols) {
@@ -60,7 +84,7 @@ export default function App() {
     setFirstClickDone(false)
     setFocused({ row: 0, col: 0 })
     setElapsed(0)
-    setResetKey((k) => k + 1)
+    setResetKey((key) => key + 1)
   }
 
   function validateCustom(r: number, c: number, m: number) {
@@ -68,6 +92,25 @@ export default function App() {
     const vr = Math.max(5, Math.min(30, r))
     const vc = Math.max(5, Math.min(30, c))
     return { rows: vr, cols: vc, mines: Math.max(1, Math.min(vr * vc - 1, maxMines)) }
+  }
+
+  function handleWin(nextBoard: BoardT) {
+    const finalBoard = revealAllMines(nextBoard)
+    setBoard(finalBoard)
+    setStatus('won')
+    if (difficultyKey !== 'custom' && isBrowser) {
+      const key = getBestKey(difficultyKey)
+      const prev = window.localStorage.getItem(key)
+      if (!prev || parseInt(prev, 10) > elapsed) {
+        window.localStorage.setItem(key, String(elapsed))
+      }
+    }
+  }
+
+  function handleLoss(nextBoard: BoardT) {
+    const finalBoard = revealAllMines(nextBoard)
+    setBoard(finalBoard)
+    setStatus('lost')
   }
 
   function onReveal(r: number, c: number) {
@@ -80,27 +123,16 @@ export default function App() {
       setStatus('running')
     }
 
-    const res = revealCell(nextBoard, r, c)
-    nextBoard = res.board
+    const result = revealCell(nextBoard, r, c)
+    nextBoard = result.board
 
-    if (res.hitMine) {
-      // reveal all mines
-      const revealMines = nextBoard.map((row) =>
-        row.map((cell) => (cell.isMine ? { ...cell, isRevealed: true } : cell))
-      )
-      setBoard(revealMines)
-      setStatus('lost')
+    if (result.hitMine) {
+      handleLoss(nextBoard)
       return
     }
 
     if (checkWin(nextBoard, mines)) {
-      setBoard(nextBoard)
-      setStatus('won')
-      if (difficultyKey !== 'custom') {
-        const key = getBestKey(difficultyKey)
-        const prev = localStorage.getItem(key)
-        if (!prev || parseInt(prev, 10) > elapsed) localStorage.setItem(key, String(elapsed))
-      }
+      handleWin(nextBoard)
       return
     }
 
@@ -109,33 +141,21 @@ export default function App() {
 
   function onToggleFlag(r: number, c: number) {
     if (status === 'lost' || status === 'won') return
-    if (!firstClickDone) setStatus('running')
-    setFirstClickDone(true)
-    setBoard((b) => toggleMark(b, r, c))
+    setBoard((prev) => toggleMark(prev, r, c))
   }
 
   function onChord(r: number, c: number) {
     if (status !== 'running') return
-    const res = chord(board, r, c)
-    if (res.hitMine) {
-      const revealMines = res.board.map((row) =>
-        row.map((cell) => (cell.isMine ? { ...cell, isRevealed: true } : cell))
-      )
-      setBoard(revealMines)
-      setStatus('lost')
+    const result = chord(board, r, c)
+    if (result.hitMine) {
+      handleLoss(result.board)
       return
     }
-    if (checkWin(res.board, mines)) {
-      setBoard(res.board)
-      setStatus('won')
-      if (difficultyKey !== 'custom') {
-        const key = getBestKey(difficultyKey)
-        const prev = localStorage.getItem(key)
-        if (!prev || parseInt(prev, 10) > elapsed) localStorage.setItem(key, String(elapsed))
-      }
+    if (checkWin(result.board, mines)) {
+      handleWin(result.board)
       return
     }
-    setBoard(res.board)
+    setBoard(result.board)
   }
 
   function changeDifficulty(key: DifficultyKey) {
@@ -143,18 +163,18 @@ export default function App() {
   }
 
   function handleCustomStart() {
-    const v = validateCustom(rows, cols, mines)
-    setRows(v.rows)
-    setCols(v.cols)
-    setMines(v.mines)
-    resetGame(v.rows, v.cols)
+    const validated = validateCustom(rows, cols, mines)
+    setRows(validated.rows)
+    setCols(validated.cols)
+    setMines(validated.mines)
+    resetGame(validated.rows, validated.cols)
   }
 
   const running = status === 'running'
 
   return (
-    <div className="app">
-      <div className="container">
+    <div className={styles.app}>
+      <div className={styles.container}>
         <Header
           difficulty={difficultyKey}
           difficulties={DIFFICULTIES}
@@ -165,14 +185,15 @@ export default function App() {
           onChangeDifficulty={changeDifficulty}
           bestTime={bestTime}
           onTick={setElapsed}
+          status={status}
         />
 
         {difficultyKey === 'custom' && (
-          <div className="controls" style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <div className={styles.controls}>
             <label>
               Rows
               <input
-                className="input"
+                className={styles.input}
                 type="number"
                 min={5}
                 max={30}
@@ -183,7 +204,7 @@ export default function App() {
             <label>
               Cols
               <input
-                className="input"
+                className={styles.input}
                 type="number"
                 min={5}
                 max={30}
@@ -194,7 +215,7 @@ export default function App() {
             <label>
               Mines
               <input
-                className="input"
+                className={styles.input}
                 type="number"
                 min={1}
                 max={rows * cols - 1}
@@ -202,7 +223,7 @@ export default function App() {
                 onChange={(e) => setMines(parseInt(e.target.value || '0', 10))}
               />
             </label>
-            <button className="button" onClick={handleCustomStart}>
+            <button className={styles.button} onClick={handleCustomStart}>
               Apply
             </button>
           </div>
@@ -218,7 +239,7 @@ export default function App() {
           setFocused={setFocused}
         />
 
-        <div className="footer" role="status" aria-live="polite">
+        <div className={styles.footer} role="status" aria-live="polite">
           {status === 'won' && 'You win!'}
           {status === 'lost' && 'Boom! You hit a mine.'}
         </div>

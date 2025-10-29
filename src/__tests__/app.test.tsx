@@ -13,8 +13,8 @@ describe('Minesweeper App', () => {
     const first = cells[0]
     // Left click reveal
     fireEvent.click(first)
-    // After reveal, it should not be hidden anymore
-    expect(first).not.toHaveClass('hidden')
+    // After reveal, it should not announce as a hidden cell anymore
+    expect(first.getAttribute('aria-label')).not.toMatch(/hidden/i)
   })
 
   it('right-click toggles flag', () => {
